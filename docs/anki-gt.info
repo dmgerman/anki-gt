@@ -1,0 +1,364 @@
+This is anki-gt.info, produced by makeinfo version 7.3 from
+anki-gt.texi.
+
+INFO-DIR-SECTION Emacs
+START-INFO-DIR-ENTRY
+* anki-gt: (anki-gt).   Emacs client for the AnkiConnect HTTP API.
+END-INFO-DIR-ENTRY
+
+
+File: anki-gt.info,  Node: Top,  Next: Overview,  Up: (dir)
+
+anki-gt
+*******
+
+* Menu:
+
+* Overview::
+* Requirements::
+* Installation::
+* Configuration::
+* Usage::
+* Building the Info manual::
+* License::
+
+-- The Detailed Node Listing --
+
+Installation
+
+* From a Git clone::
+* From straight.el: From straightel.
+
+Configuration
+
+* Connection::
+* Ruby (furigana) display::
+* Raise Anki after a jump::
+* Audio playback::
+* Preview and list buffers::
+
+Usage
+
+* Decks buffer::
+* Cards buffer::
+* Notes buffer::
+* Preview pane::
+* Find a note by field / value::
+
+
+File: anki-gt.info,  Node: Overview,  Next: Requirements,  Prev: Top,  Up: Top
+
+Overview
+********
+
+‘anki-gt’ is an Emacs client for the AnkiConnect
+(https://git.sr.ht/~foosoft/anki-connect) add-on.  It provides a
+mu4e-style browser over your Anki collection: a decks buffer, a cards
+buffer, a notes buffer, and a preview pane that renders card HTML via
+‘shr’ (with optional card CSS applied) or the raw fields as a two-column
+table.  Standard search operators (Anki's own query syntax) are
+supported via ‘s’ (search), ‘/’ (narrow), and ‘\’ (widen).
+
+   Actions that need Anki's own UI (edit a note, open a card in the
+browser) are one keystroke away: ‘e’ or ‘a’ hand off to Anki and raise
+its window via a user-provided function.
+
+
+File: anki-gt.info,  Node: Requirements,  Next: Installation,  Prev: Overview,  Up: Top
+
+Requirements
+************
+
+   • Emacs 27.1 or newer.
+   • Anki running with the AnkiConnect
+     (https://ankiweb.net/shared/info/2055492159) add-on installed and
+     reachable at ‘http://127.0.0.1:8765’ by default.
+
+
+File: anki-gt.info,  Node: Installation,  Next: Configuration,  Prev: Requirements,  Up: Top
+
+Installation
+************
+
+* Menu:
+
+* From a Git clone::
+* From straight.el: From straightel.
+
+
+File: anki-gt.info,  Node: From a Git clone,  Next: From straightel,  Up: Installation
+
+From a Git clone
+================
+
+     (use-package anki-gt
+       :straight nil
+       :load-path "~/path/to/anki-gt"
+       :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
+
+
+File: anki-gt.info,  Node: From straightel,  Prev: From a Git clone,  Up: Installation
+
+From straight.el
+================
+
+     (use-package anki-gt
+       :straight (:host github :repo "dmgerman/anki-gt")
+       :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
+
+
+File: anki-gt.info,  Node: Configuration,  Next: Usage,  Prev: Installation,  Up: Top
+
+Configuration
+*************
+
+* Menu:
+
+* Connection::
+* Ruby (furigana) display::
+* Raise Anki after a jump::
+* Audio playback::
+* Preview and list buffers::
+
+
+File: anki-gt.info,  Node: Connection,  Next: Ruby (furigana) display,  Up: Configuration
+
+Connection
+==========
+
+   • ‘anki-gt-endpoint’ (default ‘http://127.0.0.1:8765’) -
+     AnkiConnect's HTTP address.
+   • ‘anki-gt-api-key’ (default ‘nil’) - set if your AnkiConnect
+     requires an API key.
+   • ‘anki-gt-request-timeout’ (default 10) - seconds to wait for a
+     response.
+
+   Verify connectivity with ‘M-x anki-gt-check-connection’.
+
+
+File: anki-gt.info,  Node: Ruby (furigana) display,  Next: Raise Anki after a jump,  Prev: Connection,  Up: Configuration
+
+Ruby (furigana) display
+=======================
+
+‘anki-gt-show-ruby’ (default ‘t’) controls whether readings are rendered
+inline as ‘kanji[reading]’.  Toggle at runtime with ‘r’ in any anki-gt
+buffer.  To default off:
+
+     (setq anki-gt-show-ruby nil)
+
+
+File: anki-gt.info,  Node: Raise Anki after a jump,  Next: Audio playback,  Prev: Ruby (furigana) display,  Up: Configuration
+
+Raise Anki after a jump
+=======================
+
+AnkiConnect's GUI actions do not raise Anki's window on their own.  Set
+‘anki-gt-raise-anki-function’ to a no-argument function that brings Anki
+forward.  A shipped macOS helper uses osascript:
+
+     (setq anki-gt-raise-anki-function #'anki-gt-raise-anki-macos)
+
+   With Hammerspoon:
+
+     (defun my/raise-anki ()
+       (hammerspoon-do "hs.application.launchOrFocus('Anki')"))
+     (setq anki-gt-raise-anki-function #'my/raise-anki)
+
+
+File: anki-gt.info,  Node: Audio playback,  Next: Preview and list buffers,  Prev: Raise Anki after a jump,  Up: Configuration
+
+Audio playback
+==============
+
+‘anki-gt-preview-audio-command’ is auto-detected from ‘afplay’ (macOS),
+‘mpv’, then ‘ffplay’.  Override to force a specific binary, or set to
+‘nil’ to disable audio playback entirely.
+
+
+File: anki-gt.info,  Node: Preview and list buffers,  Prev: Audio playback,  Up: Configuration
+
+Preview and list buffers
+========================
+
+   • ‘anki-gt-preview-default-view’ (‘preview’ | ‘fields’): starting
+     view for a freshly-opened preview buffer.  ‘TAB’ toggles at
+     runtime.
+   • ‘anki-gt-preview-window-side’ (default ‘right’) and
+     ‘anki-gt-preview-window-width’ (default 0.5): where and how wide
+     the preview side-window is placed.
+   • ‘anki-gt-cards-limit’ (default 500): cards fetched per batch.  ‘M’
+     loads the next batch.
+   • ‘anki-gt-cards-deck-width’ (default 28) and
+     ‘anki-gt-cards-field-width’ (default 30): column widths in the
+     cards buffer.
+
+
+File: anki-gt.info,  Node: Usage,  Next: Building the Info manual,  Prev: Configuration,  Up: Top
+
+Usage
+*****
+
+* Menu:
+
+* Decks buffer::
+* Cards buffer::
+* Notes buffer::
+* Preview pane::
+* Find a note by field / value::
+
+
+File: anki-gt.info,  Node: Decks buffer,  Next: Cards buffer,  Up: Usage
+
+Decks buffer
+============
+
+‘M-x anki-gt’ opens ‘*anki-gt*’, listing every deck with its ‘(new /
+learn / due / total)’ counts.
+
+Key   Action
+--------------------------------------
+RET   Open deck as a cards buffer
+s     Prompt for an arbitrary query
+g     Refresh
+n/p   Next / previous deck row
+?     Describe mode
+q     Bury the buffer
+
+
+File: anki-gt.info,  Node: Cards buffer,  Next: Notes buffer,  Prev: Decks buffer,  Up: Usage
+
+Cards buffer
+============
+
+Opened by RET on a deck line, or via ‘M-x anki-gt-cards-open’.  Rows
+show one line per card; the first column is the deck path
+(middle-truncated, preserving the leaf segment when it fits).
+
+Key     Action
+--------------------------------------------------------
+RET     Show the card in the preview pane
+n / p   Next / previous row (auto-updates preview)
+S       Sort by column at point (toggle asc/desc)
+v       Switch to notes view of the same query
+s       New query (replaces current)
+\\      Widen: pop the last narrow
+M       Load the next batch of cards
+e       Open the card's note in Anki's editor
+o       Open the current query in Anki's Card Browser
+a       Focus Anki's Card Browser on this card
+Q       Close the preview side-window
+r       Toggle ruby (furigana) display
+g       Refresh (re-fetch)
+q       Bury the buffer
+
+   Columns: Deck / Field (sort field per model) / Card (template name) /
+State / Lapses / Reviews / Ivl.  ‘Lapses’, ‘Reviews’, and ‘Ivl’ sort
+numerically; other columns sort as strings.
+
+
+File: anki-gt.info,  Node: Notes buffer,  Next: Preview pane,  Prev: Cards buffer,  Up: Usage
+
+Notes buffer
+============
+
+Same key set as the cards buffer.  ‘v’ switches back to cards for the
+same query.  Rows are notes, deduplicated across cards.
+
+   Columns: Field (order 0) / Model / Tags / Cards.  There is no Deck
+column: a note can span multiple decks.
+
+   The preview pane in note context always shows the fields table.
+‘TAB’ errors - notes have no single rendered answer to show.
+
+
+File: anki-gt.info,  Node: Preview pane,  Next: Find a note by field / value,  Prev: Notes buffer,  Up: Usage
+
+Preview pane
+============
+
+Key     Action
+--------------------------------------------------
+TAB     Toggle rendered card ↔ fields table
+n / p   Advance / retreat in the source list
+a       Focus the record in Anki's Card Browser
+e       Open the note in Anki's editor
+r       Toggle ruby (furigana) display
+g       Re-render the current record
+q       Close the preview side-window
+
+
+File: anki-gt.info,  Node: Find a note by field / value,  Prev: Preview pane,  Up: Usage
+
+Find a note by field / value
+============================
+
+‘M-x anki-gt-find-note’ prompts for a field name (e.g.  ‘wordJp’) and a
+value (e.g.  ‘猫’) and jumps to the matching note in Anki's Card
+Browser.  Behaviour:
+
+   • 0 matches: signals an error.
+   • 1 match: jumps directly.
+   • N matches: prompts via ‘completing-read’ labelled by each note's
+     sort field + model.
+
+   With a prefix argument, ‘C-u M-x anki-gt-find-note’ opens Anki's Card
+Browser on the raw query and stops - you pick the match in Anki
+yourself.
+
+   From Elisp, an optional third argument scopes the search to a deck:
+
+     (anki-gt-find-note "wordJp" "猫" "jp::active")
+
+
+File: anki-gt.info,  Node: Building the Info manual,  Next: License,  Prev: Usage,  Up: Top
+
+Building the Info manual
+************************
+
+The Info version of this README lives at ‘docs/anki-gt.info’ and is
+built with:
+
+     make info
+
+   This requires ‘makeinfo’ in ‘PATH’ and an Emacs new enough to have
+‘ox-texinfo’.
+
+
+File: anki-gt.info,  Node: License,  Prev: Building the Info manual,  Up: Top
+
+License
+*******
+
+GPL-3.0-or-later.  See ‘LICENSE’ at the top of the repository.
+
+
+Tag Table:
+Node: Top206
+Node: Overview762
+Node: Requirements1523
+Node: Installation1840
+Node: From a Git clone2031
+Node: From straightel2308
+Node: Configuration2583
+Node: Connection2830
+Node: Ruby (furigana) display3305
+Node: Raise Anki after a jump3700
+Node: Audio playback4317
+Node: Preview and list buffers4683
+Node: Usage5435
+Node: Decks buffer5660
+Node: Cards buffer6085
+Node: Notes buffer7249
+Node: Preview pane7748
+Node: Find a note by field / value8247
+Node: Building the Info manual9018
+Node: License9362
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+Info-documentlanguage: en
+End:

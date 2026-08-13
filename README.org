@@ -1,0 +1,215 @@
+#+TITLE: anki-gt
+#+AUTHOR: Daniel M. German
+#+EMAIL: dmg@turingmachine.org
+#+LANGUAGE: en
+#+OPTIONS: ':t toc:2 num:nil author:t
+#+TEXINFO_FILENAME: anki-gt.info
+#+TEXINFO_DIR_CATEGORY: Emacs
+#+TEXINFO_DIR_TITLE: anki-gt: (anki-gt).
+#+TEXINFO_DIR_DESC: Emacs client for the AnkiConnect HTTP API.
+
+* Overview
+
+=anki-gt= is an Emacs client for the
+[[https://git.sr.ht/~foosoft/anki-connect][AnkiConnect]] add-on.  It
+provides a mu4e-style browser over your Anki collection: a decks
+buffer, a cards buffer, a notes buffer, and a preview pane that
+renders card HTML via =shr= (with optional card CSS applied) or the
+raw fields as a two-column table.  Standard search operators (Anki's
+own query syntax) are supported via ~s~ (search), ~/~ (narrow), and
+~\~ (widen).
+
+Actions that need Anki's own UI (edit a note, open a card in the
+browser) are one keystroke away: ~e~ or ~a~ hand off to Anki and
+raise its window via a user-provided function.
+
+* Requirements
+
+- Emacs 27.1 or newer.
+- Anki running with the
+  [[https://ankiweb.net/shared/info/2055492159][AnkiConnect]] add-on
+  installed and reachable at =http://127.0.0.1:8765= by default.
+
+* Installation
+
+** From a Git clone
+
+#+begin_src emacs-lisp
+(use-package anki-gt
+  :straight nil
+  :load-path "~/path/to/anki-gt"
+  :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
+#+end_src
+
+** From straight.el
+
+#+begin_src emacs-lisp
+(use-package anki-gt
+  :straight (:host github :repo "dmgerman/anki-gt")
+  :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
+#+end_src
+
+* Configuration
+
+** Connection
+
+- =anki-gt-endpoint= (default ~http://127.0.0.1:8765~) --
+  AnkiConnect's HTTP address.
+- =anki-gt-api-key= (default ~nil~) -- set if your AnkiConnect
+  requires an API key.
+- =anki-gt-request-timeout= (default 10) -- seconds to wait for
+  a response.
+
+Verify connectivity with =M-x anki-gt-check-connection=.
+
+** Ruby (furigana) display
+
+=anki-gt-show-ruby= (default ~t~) controls whether readings are
+rendered inline as ~kanji[reading]~.  Toggle at runtime with ~r~
+in any anki-gt buffer.  To default off:
+
+#+begin_src emacs-lisp
+(setq anki-gt-show-ruby nil)
+#+end_src
+
+** Raise Anki after a jump
+
+AnkiConnect's GUI actions do not raise Anki's window on their own.
+Set =anki-gt-raise-anki-function= to a no-argument function that
+brings Anki forward.  A shipped macOS helper uses osascript:
+
+#+begin_src emacs-lisp
+(setq anki-gt-raise-anki-function #'anki-gt-raise-anki-macos)
+#+end_src
+
+With Hammerspoon:
+
+#+begin_src emacs-lisp
+(defun my/raise-anki ()
+  (hammerspoon-do "hs.application.launchOrFocus('Anki')"))
+(setq anki-gt-raise-anki-function #'my/raise-anki)
+#+end_src
+
+** Audio playback
+
+=anki-gt-preview-audio-command= is auto-detected from ~afplay~
+(macOS), ~mpv~, then ~ffplay~.  Override to force a specific binary,
+or set to ~nil~ to disable audio playback entirely.
+
+** Preview and list buffers
+
+- =anki-gt-preview-default-view= (=preview= | =fields=): starting
+  view for a freshly-opened preview buffer.  =TAB= toggles at
+  runtime.
+- =anki-gt-preview-window-side= (default =right=) and
+  =anki-gt-preview-window-width= (default 0.5): where and how wide
+  the preview side-window is placed.
+- =anki-gt-cards-limit= (default 500): cards fetched per batch.
+  ~M~ loads the next batch.
+- =anki-gt-cards-deck-width= (default 28) and
+  =anki-gt-cards-field-width= (default 30): column widths in the
+  cards buffer.
+
+* Usage
+
+** Decks buffer
+
+=M-x anki-gt= opens =*anki-gt*=, listing every deck with its
+=(new / learn / due / total)= counts.
+
+| Key | Action                          |
+|-----+---------------------------------|
+| RET | Open deck as a cards buffer     |
+| s   | Prompt for an arbitrary query   |
+| g   | Refresh                         |
+| n/p | Next / previous deck row        |
+| ?   | Describe mode                   |
+| q   | Bury the buffer                 |
+
+** Cards buffer
+
+Opened by RET on a deck line, or via =M-x anki-gt-cards-open=.
+Rows show one line per card; the first column is the deck path
+(middle-truncated, preserving the leaf segment when it fits).
+
+| Key       | Action                                        |
+|-----------+-----------------------------------------------|
+| RET       | Show the card in the preview pane             |
+| n / p     | Next / previous row (auto-updates preview)    |
+| S         | Sort by column at point (toggle asc/desc)     |
+| v         | Switch to notes view of the same query        |
+| s         | New query (replaces current)                  |
+| /         | Narrow: AND a predicate onto the current query|
+| \\        | Widen: pop the last narrow                    |
+| M         | Load the next batch of cards                  |
+| e         | Open the card's note in Anki's editor         |
+| o         | Open the current query in Anki's Card Browser |
+| a         | Focus Anki's Card Browser on this card        |
+| Q         | Close the preview side-window                 |
+| r         | Toggle ruby (furigana) display                |
+| g         | Refresh (re-fetch)                            |
+| q         | Bury the buffer                               |
+
+Columns: Deck / Field (sort field per model) / Card (template name) /
+State / Lapses / Reviews / Ivl.  =Lapses=, =Reviews=, and =Ivl=
+sort numerically; other columns sort as strings.
+
+** Notes buffer
+
+Same key set as the cards buffer.  =v= switches back to cards for
+the same query.  Rows are notes, deduplicated across cards.
+
+Columns: Field (order 0) / Model / Tags / Cards.  There is no Deck
+column: a note can span multiple decks.
+
+The preview pane in note context always shows the fields table.
+=TAB= errors -- notes have no single rendered answer to show.
+
+** Preview pane
+
+| Key   | Action                                     |
+|-------+--------------------------------------------|
+| TAB   | Toggle rendered card ↔ fields table        |
+| n / p | Advance / retreat in the source list       |
+| a     | Focus the record in Anki's Card Browser    |
+| e     | Open the note in Anki's editor             |
+| r     | Toggle ruby (furigana) display             |
+| g     | Re-render the current record               |
+| q     | Close the preview side-window              |
+
+** Find a note by field / value
+
+=M-x anki-gt-find-note= prompts for a field name (e.g. =wordJp=)
+and a value (e.g. =猫=) and jumps to the matching note in Anki's
+Card Browser.  Behaviour:
+
+- 0 matches: signals an error.
+- 1 match: jumps directly.
+- N matches: prompts via =completing-read= labelled by each note's
+  sort field + model.
+
+With a prefix argument, =C-u M-x anki-gt-find-note= opens Anki's
+Card Browser on the raw query and stops -- you pick the match in
+Anki yourself.
+
+From Elisp, an optional third argument scopes the search to a deck:
+
+#+begin_src emacs-lisp
+(anki-gt-find-note "wordJp" "猫" "jp::active")
+#+end_src
+
+* Building the Info manual
+
+The Info version of this README lives at =docs/anki-gt.info=
+and is built with:
+
+#+begin_src sh
+make info
+#+end_src
+
+This requires =makeinfo= in =PATH= and an Emacs new enough to
+have =ox-texinfo=.
+
+* License
+
+GPL-3.0-or-later.  See =LICENSE= at the top of the repository.

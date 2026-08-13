@@ -10,7 +10,8 @@
 #   make check-declare  — verify declare-function file arguments (errors on any mismatch)
 #   make compile        — byte-compile every anki-gt*.el file (errors on warning)
 #   make test           — run the ERT suite in test/ (batch)
-#   make clean          — remove every *.elc file
+#   make info           — export README.org to docs/anki-gt.info
+#   make clean          — remove every *.elc file and generated docs
 #   make check          — compile + lint + checkdoc + check-declare + test
 #   make check-ci       — same as `make check' but under $(CI_EMACS)
 #                         (defaults to emacs-plus@30, matching the
@@ -59,7 +60,10 @@ EMACS_BATCH = $(EMACS) -Q --batch \
   --eval "(add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\"))" \
   --eval "(package-initialize)"
 
-.PHONY: default lint checkdoc check-declare compile test clean check check-ci
+DOCS_DIR = docs
+INFO_FILE = $(DOCS_DIR)/anki-gt.info
+
+.PHONY: default lint checkdoc check-declare compile test info clean check check-ci
 
 # Default target: byte-compile the elisp.  Lint and tests are not
 # included so the common edit-then-`make' loop stays fast; run
@@ -147,8 +151,29 @@ test:
 	  $(foreach f,$(TEST_FILES),-l $(f)) \
 	  -f ert-run-tests-batch-and-exit
 
+# Export README.org to Info via Org's texinfo exporter.  Requires
+# `makeinfo' in PATH (the standard Texinfo tool that Org shells out to)
+# and an Emacs new enough to bundle `ox-texinfo' (all supported
+# versions).  Output filename is set inside README.org via
+# `#+TEXINFO_FILENAME'; we move the file into $(DOCS_DIR) after.
+info: $(INFO_FILE)
+
+$(DOCS_DIR):
+	@mkdir -p $@
+
+$(INFO_FILE): README.org | $(DOCS_DIR)
+	cp README.org $(DOCS_DIR)/anki-gt.org
+	$(EMACS) -Q --batch \
+	  --eval "(setq load-prefer-newer t)" \
+	  --eval "(require 'ox-texinfo)" \
+	  $(DOCS_DIR)/anki-gt.org \
+	  -f org-texinfo-export-to-info
+	rm -f $(DOCS_DIR)/anki-gt.org $(DOCS_DIR)/anki-gt.texi
+
 clean:
-	rm -f *.elc test/*.elc
+	rm -f *.elc test/*.elc \
+	      *.texi *.info \
+	      $(DOCS_DIR)/anki-gt.org $(DOCS_DIR)/anki-gt.texi $(INFO_FILE)
 
 check: compile lint checkdoc check-declare test
 
