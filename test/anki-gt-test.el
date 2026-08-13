@@ -403,6 +403,21 @@ display, so cards from odd/legacy models still show something."
                   "deck::AnAbsurdlyVeryLongLeafSegmentName" 20)
                  "deck::AnAbsurdlyVer…")))
 
+;;;; anki-gt: field-value query builder
+
+(ert-deftest anki-gt-test-find-note-query-basic ()
+  "FIELD:VALUE is wrapped in double quotes so spaces survive."
+  (should (equal (anki-gt--build-field-value-query "wordJp" "猫")
+                 "\"wordJp:猫\""))
+  (should (equal (anki-gt--build-field-value-query "Front" "hello world")
+                 "\"Front:hello world\"")))
+
+(ert-deftest anki-gt-test-find-note-query-with-deck ()
+  "DECK is prepended as `deck:\"...\"'."
+  (should (equal (anki-gt--build-field-value-query
+                  "wordJp" "猫" "jp::active")
+                 "deck:\"jp::active\" \"wordJp:猫\"")))
+
 ;;;; anki-gt: literal-furigana stripper
 
 (ert-deftest anki-gt-test-strip-literal-furigana-basic ()

@@ -443,6 +443,79 @@ user sees the result immediately."
       (anki-gt-api-error nil))
     (anki-gt-raise-anki)))
 
+;;;; Field-value lookup and jump
+
+(defun anki-gt--build-field-value-query (field value &optional deck)
+  "Build an Anki search query for FIELD equal to VALUE.
+When DECK is non-nil, restricts the search with `deck:\"DECK\"'.
+The FIELD:VALUE clause is wrapped in double quotes so values
+containing spaces and other whitespace still match."
+  (let ((clause (format "\"%s:%s\"" field value)))
+    (if deck
+        (format "deck:%S %s" deck clause)
+      clause)))
+
+(defun anki-gt--open-note-in-anki (note-id)
+  "Open NOTE-ID in Anki's Card Browser (filtered by `nid:') and raise Anki."
+  (anki-gt-request "guiBrowse" `((query . ,(format "nid:%s" note-id))))
+  (anki-gt-raise-anki))
+
+(defun anki-gt--pick-note (note-ids)
+  "Prompt the user to pick one of NOTE-IDS via `completing-read'.
+Fetches note metadata via `notesInfo' and labels each candidate
+with its sort field + model name.  Returns the chosen note-id."
+  (let* ((notes (anki-gt-request "notesInfo"
+                                 `((notes . ,(vconcat note-ids)))))
+         (candidates
+          (mapcar (lambda (note)
+                    (cons (format "%s  [%s]"
+                                  (anki-gt-field-at-order note 0)
+                                  (or (alist-get 'modelName note) ""))
+                          (alist-get 'noteId note)))
+                  notes))
+         (choice (completing-read "Note: " candidates nil t)))
+    (alist-get choice candidates nil nil #'equal)))
+
+;;;###autoload
+(defun anki-gt-find-note (field value &optional deck)
+  "Find notes where FIELD equals VALUE and jump to them in Anki.
+FIELD is a note-type field name (e.g. `wordJp'); VALUE is the
+exact field content (e.g. `猫').  DECK, when non-nil, scopes
+the search to a single deck; interactively DECK is always nil.
+
+With a prefix argument, opens Anki's Card Browser on the query
+and stops; the user selects among matches themselves in Anki.
+Otherwise:
+
+  0 matches  -- signals `user-error'.
+  1 match    -- opens that note in Anki (`guiBrowse nid:<id>').
+  N matches  -- prompts via `completing-read', then opens.
+
+Every jump also runs `anki-gt-raise-anki' so Anki comes to the
+foreground."
+  (interactive
+   (list (read-string "Field: ")
+         (read-string "Value: ")))
+  (let ((query (anki-gt--build-field-value-query field value deck)))
+    (cond
+     (current-prefix-arg
+      (anki-gt-request "guiBrowse" `((query . ,query)))
+      (anki-gt-raise-anki)
+      (message "Opened query in Anki: %s" query))
+     (t
+      (let ((note-ids (anki-gt-request "findNotes" `((query . ,query)))))
+        (cond
+         ((null note-ids)
+          (user-error "No notes match %s" query))
+         ((= (length note-ids) 1)
+          (anki-gt--open-note-in-anki (car note-ids))
+          (message "Opened 1 match: nid:%s" (car note-ids)))
+         (t
+          (let ((chosen (anki-gt--pick-note note-ids)))
+            (anki-gt--open-note-in-anki chosen)
+            (message "Opened nid:%s (of %d matches)"
+                     chosen (length note-ids))))))))))
+
 ;;;; Top-level entry point
 
 ;;;###autoload
