@@ -149,22 +149,29 @@ column in Anki's own deck browser."
              'face 'anki-gt-main-header-face))))
 
 (defun anki-gt-main--insert-decks (rows)
-  "Insert the Decks section from ROWS (as returned by `anki-gt-main--fetch-decks')."
+  "Insert the Decks section from ROWS (as returned by `anki-gt-main--fetch-decks').
+The column labels for the four numeric columns are rendered in
+the window header line by `anki-gt-main--set-header-line', not
+in the buffer text."
   (insert (propertize "Decks\n" 'face 'anki-gt-main-section-face))
-  (anki-gt-main--insert-column-header)
   (dolist (row rows)
     (anki-gt-main--insert-deck-line row))
   (insert "\n"))
 
-(defun anki-gt-main--insert-column-header ()
-  "Insert a right-aligned header labelling the four stat columns.
-Labels line up with the numeric columns emitted by
-`anki-gt-main--insert-deck-line'."
+(defun anki-gt-main--set-header-line ()
+  "Set the buffer's header line to label the four stat columns.
+Padding + `%6s' columns match the layout used by
+`anki-gt-main--insert-deck-line' below, so header cells align
+above their data cells.  The leading `space :align-to 0'
+positions the string flush with buffer column 0, matching what
+`tabulated-list-init-header' does for its own header line."
   (let ((padding (make-string anki-gt-main--name-column ?\ )))
-    (insert (propertize
-             (format "%s%6s %6s %6s %6s\n"
-                     padding "New" "Learn" "Due" "Total")
-             'face 'anki-gt-main-header-face))))
+    (setq-local header-line-format
+                (list (propertize " " 'display '(space :align-to 0))
+                      (propertize
+                       (format "%s%6s %6s %6s %6s"
+                               padding "New" "Learn" "Due" "Total")
+                       'face 'anki-gt-main-header-face)))))
 
 (defun anki-gt-main--insert-deck-line (row)
   "Insert one deck line for ROW (a plist from `anki-gt-main--fetch-decks').
@@ -205,7 +212,7 @@ The Due column is highlighted when its value is positive."
   "Insert the Actions footer for the anki-gt buffer."
   (insert (propertize "Actions\n" 'face 'anki-gt-main-section-face))
   (insert "  g  refresh    n/p  next/previous    RET  open deck    ")
-  (insert "?  help    q  quit\n"))
+  (insert "s  search    ?  help    q  quit\n"))
 
 (defun anki-gt-main--render ()
   "Fully repaint the current buffer (must be `anki-gt-main-mode')."
@@ -216,6 +223,7 @@ The Due column is highlighted when its value is positive."
     (anki-gt-main--insert-header)
     (anki-gt-main--insert-decks rows)
     (anki-gt-main--insert-footer)
+    (anki-gt-main--set-header-line)
     (goto-char (point-min))
     (anki-gt-main--goto-deck (or prev-deck
                                  (and rows (plist-get (car rows) :name))))))
@@ -253,15 +261,29 @@ Falls back to the first deck line if NAME is nil or not found."
   (interactive)
   (quit-window))
 
+(declare-function anki-gt-cards-open "anki-gt-cards" (query &optional label))
+(defvar anki-gt-cards--query-history)
+
 (defun anki-gt-main-open-at-point ()
-  "Placeholder for opening the deck at point in a query buffer.
-The query buffer is not implemented yet, so this just echoes the
-query that would be run."
+  "Open the deck at point in a card-list buffer scoped to that deck."
   (interactive)
   (let ((name (get-text-property (point) 'anki-gt-deck-name)))
-    (if name
-        (message "would run: deck:\"%s\"" name)
-      (user-error "No deck at point"))))
+    (unless name (user-error "No deck at point"))
+    (require 'anki-gt-cards)
+    (anki-gt-cards-open (format "deck:%S" name) name)))
+
+(defun anki-gt-main-search (query)
+  "Prompt for an Anki search QUERY and open a cards buffer for it.
+Shares history with the cards-buffer `s' command."
+  (interactive
+   (progn
+     (require 'anki-gt-cards)
+     (list (read-string "Anki query: "
+                        nil 'anki-gt-cards--query-history))))
+  (when (string-empty-p (string-trim query))
+    (user-error "Empty query"))
+  (require 'anki-gt-cards)
+  (anki-gt-cards-open query query))
 
 (defun anki-gt-main-next-line (&optional n)
   "Move point down N lines, staying on lines that carry a deck name.
@@ -294,16 +316,19 @@ line exists in the requested direction."
 
 ;;;; Mode definition
 
-(defvar anki-gt-main-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "g") #'anki-gt-main-refresh)
-    (define-key map (kbd "q") #'anki-gt-main-quit)
-    (define-key map (kbd "n") #'anki-gt-main-next-line)
-    (define-key map (kbd "p") #'anki-gt-main-previous-line)
-    (define-key map (kbd "RET") #'anki-gt-main-open-at-point)
-    (define-key map (kbd "?") #'describe-mode)
-    map)
+(defvar anki-gt-main-mode-map (make-sparse-keymap)
   "Keymap for `anki-gt-main-mode'.")
+
+;; Bindings are re-applied on every file load so live sessions pick up
+;; new keys without a restart; a bare `defvar' would short-circuit.
+(let ((map anki-gt-main-mode-map))
+  (define-key map (kbd "g")   #'anki-gt-main-refresh)
+  (define-key map (kbd "q")   #'anki-gt-main-quit)
+  (define-key map (kbd "n")   #'anki-gt-main-next-line)
+  (define-key map (kbd "p")   #'anki-gt-main-previous-line)
+  (define-key map (kbd "RET") #'anki-gt-main-open-at-point)
+  (define-key map (kbd "s")   #'anki-gt-main-search)
+  (define-key map (kbd "?")   #'describe-mode))
 
 (define-derived-mode anki-gt-main-mode special-mode "Anki-GT"
   "Top-level buffer for the anki-gt AnkiConnect client.

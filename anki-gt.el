@@ -54,6 +54,7 @@
 (require 'json)
 (require 'url)
 (require 'subr-x)
+(require 'cl-lib)
 
 ;;;; Customization
 
@@ -91,6 +92,44 @@ Passed to `url-retrieve-synchronously' as its INHIBIT-COOKIES
 sibling TIMEOUT argument."
   :type 'number
   :group 'anki-gt)
+
+(defcustom anki-gt-show-ruby t
+  "When non-nil, render ruby (furigana) readings inline as `base[reading]'.
+When nil, drop the reading entirely and show only the base text.
+Applies uniformly across the preview pane and the field-1 column
+of cards buffers.  Toggle interactively with `anki-gt-toggle-ruby'."
+  :type 'boolean
+  :group 'anki-gt)
+
+(defcustom anki-gt-raise-anki-function nil
+  "Function called to bring the Anki application to the foreground.
+Invoked with no arguments at the end of
+`anki-gt-open-card-in-anki', because AnkiConnect does not raise
+Anki's window on its own.  Set to nil (the default) to skip
+window activation.
+
+Example for macOS via osascript:
+  (setq anki-gt-raise-anki-function #\\='anki-gt-raise-anki-macos)"
+  :type '(choice (const :tag "Do nothing" nil) function)
+  :group 'anki-gt)
+
+;;;###autoload
+(defun anki-gt-toggle-ruby ()
+  "Toggle inline display of ruby (furigana) readings.
+Flips `anki-gt-show-ruby' and refreshes the visible preview and
+the current cards buffer, if any.  Other cards buffers pick up
+the new setting on their next repaint."
+  (interactive)
+  (setq anki-gt-show-ruby (not anki-gt-show-ruby))
+  (when (fboundp 'anki-gt-preview-visible-p)
+    (when (anki-gt-preview-visible-p)
+      (with-current-buffer (get-buffer "*anki-gt-preview*")
+        (when (fboundp 'anki-gt-preview-refresh)
+          (anki-gt-preview-refresh)))))
+  (when (and (derived-mode-p 'anki-gt-cards-mode)
+             (fboundp 'anki-gt-cards--rerender))
+    (anki-gt-cards--rerender))
+  (message "anki-gt ruby: %s" (if anki-gt-show-ruby "on" "off")))
 
 ;;;; Errors
 
@@ -240,6 +279,169 @@ plain error if its reported version is lower than
     (when (called-interactively-p 'interactive)
       (message "AnkiConnect OK (API version %d)" reported))
     reported))
+
+;;;; Media directory (cached)
+
+(defvar anki-gt--media-dir-cache nil
+  "Cached value of the collection.media directory path.
+Populated on first call to `anki-gt-media-dir'; cleared by
+`anki-gt-media-dir-invalidate'.")
+
+(defun anki-gt-media-dir ()
+  "Return the absolute path to Anki's collection.media folder.
+Cached across the session; invalidate with
+`anki-gt-media-dir-invalidate' after switching Anki profiles."
+  (or anki-gt--media-dir-cache
+      (setq anki-gt--media-dir-cache
+            (anki-gt-request "getMediaDirPath"))))
+
+;;;###autoload
+(defun anki-gt-media-dir-invalidate ()
+  "Discard the cached media-directory path.
+Useful after switching Anki profiles or moving the collection."
+  (interactive)
+  (setq anki-gt--media-dir-cache nil)
+  (when (called-interactively-p 'interactive)
+    (message "anki-gt media-dir cache cleared")))
+
+(defun anki-gt-truncate-middle (str max-width)
+  "Return STR truncated to MAX-WIDTH by eliding the middle with `…'.
+When STR contains the deck separator `::' and its final segment
+fits, preserves the trailing `…::LAST' so the leaf name stays
+intact and readable.  Falls back to a naive middle-elide when
+no separator is present or the last segment alone exceeds
+MAX-WIDTH.  Returns STR unchanged when its display width is at
+most MAX-WIDTH."
+  (let ((str (or str "")))
+    (cond
+     ((<= (string-width str) max-width) str)
+     (t
+      (let* ((parts (split-string str "::"))
+             (last (car (last parts))))
+        (if (or (= (length parts) 1)
+                (>= (string-width last) (1- max-width)))
+            ;; No separator, or the leaf alone won't fit -- naive.
+            (truncate-string-to-width str max-width nil nil "…")
+          (let* ((tail (concat "…::" last))
+                 (prefix-max (- max-width (string-width tail))))
+            (if (<= prefix-max 0)
+                tail
+              (concat (truncate-string-to-width str prefix-max nil nil "")
+                      tail)))))))))
+
+(defun anki-gt-transform-ruby (str)
+  "Rewrite `<ruby>' markup in STR per `anki-gt-show-ruby'.
+With ruby on, `<rt>reading</rt>' becomes `[reading]' inline.
+With ruby off, the reading is dropped, only the base survives,
+and any pre-baked literal `kanji[reading]' patterns in the raw
+text are stripped via `anki-gt-strip-literal-furigana'.
+Regex-based, not a full parser -- adequate for list-buffer
+field display, where noisy edge cases fall through to the
+generic tag stripper."
+  (let* ((s (replace-regexp-in-string "<rp>[^<]*</rp>" "" str))
+         (s (replace-regexp-in-string
+             "<rt>\\([^<]*\\)</rt>"
+             (if anki-gt-show-ruby "[\\1]" "")
+             s))
+         (s (replace-regexp-in-string "</?rb>" "" s))
+         (s (replace-regexp-in-string "</?ruby[^>]*>" "" s))
+         (s (if anki-gt-show-ruby s (anki-gt-strip-literal-furigana s))))
+    s))
+
+(defun anki-gt-strip-html (str)
+  "Remove HTML tags, [sound:] tags, and collapse whitespace in STR.
+Ruby markup is rewritten first by `anki-gt-transform-ruby' so
+its behaviour tracks `anki-gt-show-ruby'.  Also decodes the small
+set of HTML entities commonly used in Anki fields.  Returns the
+empty string when STR is nil."
+  (thread-last (or str "")
+    (anki-gt-transform-ruby)
+    (replace-regexp-in-string "\\[sound:[^]]+\\]" "")
+    (replace-regexp-in-string "<[^>]+>" "")
+    (replace-regexp-in-string "&nbsp;" " ")
+    (replace-regexp-in-string "&amp;" "&")
+    (replace-regexp-in-string "&lt;" "<")
+    (replace-regexp-in-string "&gt;" ">")
+    (replace-regexp-in-string "&quot;" "\"")
+    (replace-regexp-in-string "\\s-+" " ")
+    (string-trim)))
+
+(defun anki-gt-field-at-order (record order)
+  "Return RECORD's field value at ORDER, HTML-stripped.
+RECORD may be a card or a note; both expose a `fields' alist.
+ORDER is the integer index of the field.  Returns the empty
+string when no field with that order exists."
+  (let ((found (cl-find-if
+                (lambda (pair)
+                  (eq order (alist-get 'order (cdr pair))))
+                (alist-get 'fields record))))
+    (anki-gt-strip-html (and found (alist-get 'value (cdr found))))))
+
+;;;; Literal furigana stripping
+
+(defun anki-gt-strip-literal-furigana (str)
+  "In STR, drop pre-baked furigana in the `base[reading]' format.
+Some Anki templates (Yomichan imports, MIA decks, Jalup cards)
+bake readings directly into the field text rather than using
+`<ruby>' HTML, so the DOM ruby handler cannot see them.  This
+text-level pass strips them when `anki-gt-show-ruby' is off.
+
+Matches:
+
+  BASE `[' READING (`;' MARKER)? `]'
+
+BASE is one or more CJK ideographs or kana (so `出産[しゅっさん]',
+`する[,する]', and `分[わ,わかる]' all count).  READING is zero
+or more kana or commas.  MARKER is optional and consists of
+ASCII letters/digits, matching Jalup / MIA markers like `h',
+`k2', `o'.  Content that contains English text (`[dog]',
+`[toolぐ]', `[exampleれい]') is left alone -- those are
+annotations, not furigana."
+  (replace-regexp-in-string
+   "\\([一-鿯々〆〤ヶヵぁ-ゖァ-ヺー]+\\)\\[[ぁ-ゖァ-ヺー,]*\\(?:;[A-Za-z0-9]+\\)?\\]"
+   "\\1"
+   (or str "")))
+
+;;;; Raise Anki (window activation)
+
+;;;###autoload
+(defun anki-gt-raise-anki ()
+  "Invoke `anki-gt-raise-anki-function' if it is set.
+Interactive so it can be bound to a key directly for standalone
+window activation; called automatically at the end of
+`anki-gt-open-card-in-anki'.  A no-op when the variable is nil."
+  (interactive)
+  (when (functionp anki-gt-raise-anki-function)
+    (funcall anki-gt-raise-anki-function)))
+
+;;;###autoload
+(defun anki-gt-raise-anki-macos ()
+  "Bring the Anki macOS application to the foreground via osascript.
+Suitable both as the value of `anki-gt-raise-anki-function' and
+as a standalone interactive command."
+  (interactive)
+  (call-process "osascript" nil 0 nil
+                "-e" "tell application \"Anki\" to activate"))
+
+;;;; Open a specific card in Anki's Card Browser
+
+;;;###autoload
+(defun anki-gt-open-card-in-anki (card)
+  "Open CARD in Anki's Card Browser dialog and raise the window.
+Sends `guiBrowse cid:<id>' to filter the browser to just this
+card -- with a one-card result set the row is unambiguously in
+view.  `guiSelectCard' is called opportunistically to select the
+row explicitly, but it is only present in newer AnkiConnect
+releases; the resulting `unsupported action' error is swallowed
+on older ones.  Finally, `anki-gt-raise-anki' is invoked so the
+user sees the result immediately."
+  (let ((cid (or (alist-get 'cardId card)
+                 (user-error "Card record has no `cardId' field"))))
+    (anki-gt-request "guiBrowse" `((query . ,(format "cid:%s" cid))))
+    (condition-case _err
+        (anki-gt-request "guiSelectCard" `((card . ,cid)))
+      (anki-gt-api-error nil))
+    (anki-gt-raise-anki)))
 
 ;;;; Top-level entry point
 

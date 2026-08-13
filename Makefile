@@ -18,16 +18,21 @@
 #
 # Override the Emacs binary by passing EMACS=path/to/emacs.
 #
-# Integration tests that hit a live AnkiConnect are opt-in: set
-# ANKI_GT_INTEGRATION=1 in the environment before `make test'.  Without
-# it, `make test' runs unit tests only and never touches the network.
+# Integration tests that hit a live AnkiConnect are auto-detected:
+# they run when AnkiConnect answers a `version' probe and are skipped
+# otherwise, so `make test' works whether Anki is running or not.  To
+# force them off (e.g. for pure offline / CI-clean runs even with Anki
+# up), set `ANKI_GT_NO_INTEGRATION=1' in the environment.
 
 EMACS ?= emacs
 
 # Foundational files first so follow-on files can (require 'anki-gt) without
 # erroring when compiled in isolation.
 EL_FILES = anki-gt.el \
-           anki-gt-main.el
+           anki-gt-main.el \
+           anki-gt-cards.el \
+           anki-gt-notes.el \
+           anki-gt-preview.el
 
 TEST_FILES = test/anki-gt-test.el
 
@@ -43,7 +48,12 @@ DEPS = package-lint
 
 # Common Emacs invocation header: project-local package-user-dir, MELPA in
 # package-archives, package-initialize so installed packages are on load-path.
+# `load-prefer-newer' forces `require' to pick whichever of .el / .elc is
+# newer, so a stale .elc from a previous `make compile' can never mask a
+# fresh source edit during `make test' or any ad-hoc load.  This makes
+# `rm *.elc' unnecessary as a manual pre-step.
 EMACS_BATCH = $(EMACS) -Q --batch \
+  --eval "(setq load-prefer-newer t)" \
   --eval "(setq package-user-dir (expand-file-name \"$(ELPA_DIR)\"))" \
   --eval "(require 'package)" \
   --eval "(add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\"))" \
@@ -127,9 +137,10 @@ compile: $(ELPA_DIR)/.installed
 
 # Run the ERT suite in batch.  `-L .' puts the sources on the load-path
 # so tests can (require 'anki-gt).  Integration tests that hit a live
-# AnkiConnect are opt-in: they check (getenv "ANKI_GT_INTEGRATION")
-# and self-skip otherwise, so this target is safe to run in CI without
-# a running Anki.
+# AnkiConnect auto-detect reachability via a `version' probe; they run
+# when Anki is up and self-skip otherwise, so this target is safe in
+# CI without a running Anki.  Set `ANKI_GT_NO_INTEGRATION=1' to force
+# them off unconditionally.
 test:
 	$(EMACS_BATCH) \
 	  -L . \
