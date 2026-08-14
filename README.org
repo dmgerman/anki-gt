@@ -6,22 +6,20 @@
 #+TEXINFO_FILENAME: anki-gt.info
 #+TEXINFO_DIR_CATEGORY: Emacs
 #+TEXINFO_DIR_TITLE: anki-gt: (anki-gt).
-#+TEXINFO_DIR_DESC: Emacs client for the AnkiConnect HTTP API.
+#+TEXINFO_DIR_DESC: Emacs client for Anki.
 
 * Overview
 
-=anki-gt= is an Emacs client for the
+=anki-gt= is an Emacs client Anki that uses the
 [[https://git.sr.ht/~foosoft/anki-connect][AnkiConnect]] add-on.  It
 provides a mu4e-style browser over your Anki collection: a decks
-buffer, a cards buffer, a notes buffer, and a preview pane that
-renders card HTML via =shr= (with optional card CSS applied) or the
+buffer, a cards buffer, a notes buffer, and a preview pane or the
 raw fields as a two-column table.  Standard search operators (Anki's
 own query syntax) are supported via ~s~ (search), ~/~ (narrow), and
 ~\~ (widen).
 
 Actions that need Anki's own UI (edit a note, open a card in the
-browser) are one keystroke away: ~e~ or ~a~ hand off to Anki and
-raise its window via a user-provided function.
+browser) are one keystroke away.
 
 * Requirements
 
@@ -41,7 +39,7 @@ raise its window via a user-provided function.
   :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
 #+end_src
 
-** From straight.el
+** Using straight.el
 
 #+begin_src emacs-lisp
 (use-package anki-gt
@@ -82,13 +80,7 @@ brings Anki forward.  A shipped macOS helper uses osascript:
 (setq anki-gt-raise-anki-function #'anki-gt-raise-anki-macos)
 #+end_src
 
-With Hammerspoon:
-
-#+begin_src emacs-lisp
-(defun my/raise-anki ()
-  (hammerspoon-do "hs.application.launchOrFocus('Anki')"))
-(setq anki-gt-raise-anki-function #'my/raise-anki)
-#+end_src
+Other operating systems will require a similar function.
 
 ** Audio playback
 
@@ -198,17 +190,34 @@ From Elisp, an optional third argument scopes the search to a deck:
 (anki-gt-find-note "wordJp" "猫" "jp::active")
 #+end_src
 
-* Building the Info manual
+* Info manual
 
-The Info version of this README lives at =docs/anki-gt.info=
-and is built with:
+The Info version of this README (=anki-gt.info=) and its =dir=
+entry live at the package root, following the multi-file ELPA
+convention.  When installed via =package.el= (from an ELPA-style
+archive or a =package-install-file= on a tarball), Emacs adds the
+package's content directory to =Info-directory-list= automatically
+and =C-h i= lists the manual under =Emacs=.
+
+For installs that bypass =package.el= (raw =:load-path=, git
+submodule, straight.el without info handling), point Info at the
+package directory once in your config:
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'info
+  (info-initialize)
+  (add-to-list 'Info-directory-list
+               (file-name-directory (locate-library "anki-gt"))))
+#+end_src
+
+To rebuild the Info files after editing =README.org=:
 
 #+begin_src sh
 make info
 #+end_src
 
-This requires =makeinfo= in =PATH= and an Emacs new enough to
-have =ox-texinfo=.
+Requires =makeinfo= and =install-info= in =PATH=.  Both
+=anki-gt.info= and =dir= are checked in.
 
 * License
 

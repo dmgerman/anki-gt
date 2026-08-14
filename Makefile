@@ -60,8 +60,8 @@ EMACS_BATCH = $(EMACS) -Q --batch \
   --eval "(add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\"))" \
   --eval "(package-initialize)"
 
-DOCS_DIR = docs
-INFO_FILE = $(DOCS_DIR)/anki-gt.info
+INFO_FILE = anki-gt.info
+INFO_DIR  = dir
 
 .PHONY: default lint checkdoc check-declare compile test info clean check check-ci
 
@@ -151,29 +151,36 @@ test:
 	  $(foreach f,$(TEST_FILES),-l $(f)) \
 	  -f ert-run-tests-batch-and-exit
 
-# Export README.org to Info via Org's texinfo exporter.  Requires
-# `makeinfo' in PATH (the standard Texinfo tool that Org shells out to)
-# and an Emacs new enough to bundle `ox-texinfo' (all supported
-# versions).  Output filename is set inside README.org via
-# `#+TEXINFO_FILENAME'; we move the file into $(DOCS_DIR) after.
-info: $(INFO_FILE)
+# Build the Info manual and its `dir' entry alongside the sources.
+# Follows the multi-file ELPA convention: `.info' and `dir' live at
+# the package's root so `package.el' auto-registers them via
+# `Info-directory-list' on activation.  Both files are checked in.
+#
+# Requires `makeinfo' and `install-info' in PATH.  Uses Org's
+# texinfo exporter for the .info; `install-info' produces `dir'
+# from the `INFO-DIR-*' fields at the top of README.org.
+info: $(INFO_FILE) $(INFO_DIR)
 
-$(DOCS_DIR):
-	@mkdir -p $@
-
-$(INFO_FILE): README.org | $(DOCS_DIR)
-	cp README.org $(DOCS_DIR)/anki-gt.org
+$(INFO_FILE): README.org
+	@# Stage README.org as anki-gt.org so Org's basename-derived
+	@# output aligns with the `#+TEXINFO_FILENAME' inside; otherwise
+	@# Org compiles README.texi and then can't find README.info.
+	cp README.org anki-gt.org
 	$(EMACS) -Q --batch \
 	  --eval "(setq load-prefer-newer t)" \
 	  --eval "(require 'ox-texinfo)" \
-	  $(DOCS_DIR)/anki-gt.org \
+	  anki-gt.org \
 	  -f org-texinfo-export-to-info
-	rm -f $(DOCS_DIR)/anki-gt.org $(DOCS_DIR)/anki-gt.texi
+	@rm -f anki-gt.org anki-gt.texi
 
+$(INFO_DIR): $(INFO_FILE)
+	install-info --info-file=$(INFO_FILE) --dir-file=$(INFO_DIR)
+
+# `clean' does NOT remove $(INFO_FILE) or $(INFO_DIR): both are
+# committed artifacts consumed by the ELPA package activation.
+# Rebuild them with `make info' when README.org changes.
 clean:
-	rm -f *.elc test/*.elc \
-	      *.texi *.info \
-	      $(DOCS_DIR)/anki-gt.org $(DOCS_DIR)/anki-gt.texi $(INFO_FILE)
+	rm -f *.elc test/*.elc README.texi
 
 check: compile lint checkdoc check-declare test
 

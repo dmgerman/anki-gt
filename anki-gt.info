@@ -3,7 +3,7 @@ anki-gt.texi.
 
 INFO-DIR-SECTION Emacs
 START-INFO-DIR-ENTRY
-* anki-gt: (anki-gt).   Emacs client for the AnkiConnect HTTP API.
+* anki-gt: (anki-gt).   Emacs client for Anki.
 END-INFO-DIR-ENTRY
 
 
@@ -19,7 +19,7 @@ anki-gt
 * Installation::
 * Configuration::
 * Usage::
-* Building the Info manual::
+* Info manual::
 * License::
 
 -- The Detailed Node Listing --
@@ -27,7 +27,7 @@ anki-gt
 Installation
 
 * From a Git clone::
-* From straight.el: From straightel.
+* Using straight.el: Using straightel.
 
 Configuration
 
@@ -51,17 +51,15 @@ File: anki-gt.info,  Node: Overview,  Next: Requirements,  Prev: Top,  Up: Top
 Overview
 ********
 
-‘anki-gt’ is an Emacs client for the AnkiConnect
+‘anki-gt’ is an Emacs client Anki that uses the AnkiConnect
 (https://git.sr.ht/~foosoft/anki-connect) add-on.  It provides a
 mu4e-style browser over your Anki collection: a decks buffer, a cards
-buffer, a notes buffer, and a preview pane that renders card HTML via
-‘shr’ (with optional card CSS applied) or the raw fields as a two-column
-table.  Standard search operators (Anki's own query syntax) are
-supported via ‘s’ (search), ‘/’ (narrow), and ‘\’ (widen).
+buffer, a notes buffer, and a preview pane or the raw fields as a
+two-column table.  Standard search operators (Anki's own query syntax)
+are supported via ‘s’ (search), ‘/’ (narrow), and ‘\’ (widen).
 
    Actions that need Anki's own UI (edit a note, open a card in the
-browser) are one keystroke away: ‘e’ or ‘a’ hand off to Anki and raise
-its window via a user-provided function.
+browser) are one keystroke away.
 
 
 File: anki-gt.info,  Node: Requirements,  Next: Installation,  Prev: Overview,  Up: Top
@@ -83,10 +81,10 @@ Installation
 * Menu:
 
 * From a Git clone::
-* From straight.el: From straightel.
+* Using straight.el: Using straightel.
 
 
-File: anki-gt.info,  Node: From a Git clone,  Next: From straightel,  Up: Installation
+File: anki-gt.info,  Node: From a Git clone,  Next: Using straightel,  Up: Installation
 
 From a Git clone
 ================
@@ -97,10 +95,10 @@ From a Git clone
        :commands (anki-gt anki-gt-find-note anki-gt-toggle-ruby))
 
 
-File: anki-gt.info,  Node: From straightel,  Prev: From a Git clone,  Up: Installation
+File: anki-gt.info,  Node: Using straightel,  Prev: From a Git clone,  Up: Installation
 
-From straight.el
-================
+Using straight.el
+=================
 
      (use-package anki-gt
        :straight (:host github :repo "dmgerman/anki-gt")
@@ -159,11 +157,7 @@ forward.  A shipped macOS helper uses osascript:
 
      (setq anki-gt-raise-anki-function #'anki-gt-raise-anki-macos)
 
-   With Hammerspoon:
-
-     (defun my/raise-anki ()
-       (hammerspoon-do "hs.application.launchOrFocus('Anki')"))
-     (setq anki-gt-raise-anki-function #'my/raise-anki)
+   Other operating systems will require a similar function.
 
 
 File: anki-gt.info,  Node: Audio playback,  Next: Preview and list buffers,  Prev: Raise Anki after a jump,  Up: Configuration
@@ -194,7 +188,7 @@ Preview and list buffers
      cards buffer.
 
 
-File: anki-gt.info,  Node: Usage,  Next: Building the Info manual,  Prev: Configuration,  Up: Top
+File: anki-gt.info,  Node: Usage,  Next: Info manual,  Prev: Configuration,  Up: Top
 
 Usage
 *****
@@ -311,21 +305,36 @@ yourself.
      (anki-gt-find-note "wordJp" "猫" "jp::active")
 
 
-File: anki-gt.info,  Node: Building the Info manual,  Next: License,  Prev: Usage,  Up: Top
+File: anki-gt.info,  Node: Info manual,  Next: License,  Prev: Usage,  Up: Top
 
-Building the Info manual
-************************
+Info manual
+***********
 
-The Info version of this README lives at ‘docs/anki-gt.info’ and is
-built with:
+The Info version of this README (‘anki-gt.info’) and its ‘dir’ entry
+live at the package root, following the multi-file ELPA convention.
+When installed via ‘package.el’ (from an ELPA-style archive or a
+‘package-install-file’ on a tarball), Emacs adds the package's content
+directory to ‘Info-directory-list’ automatically and ‘C-h i’ lists the
+manual under ‘Emacs’.
+
+   For installs that bypass ‘package.el’ (raw ‘:load-path’, git
+submodule, straight.el without info handling), point Info at the package
+directory once in your config:
+
+     (with-eval-after-load 'info
+       (info-initialize)
+       (add-to-list 'Info-directory-list
+                    (file-name-directory (locate-library "anki-gt"))))
+
+   To rebuild the Info files after editing ‘README.org’:
 
      make info
 
-   This requires ‘makeinfo’ in ‘PATH’ and an Emacs new enough to have
-‘ox-texinfo’.
+   Requires ‘makeinfo’ and ‘install-info’ in ‘PATH’.  Both
+‘anki-gt.info’ and ‘dir’ are checked in.
 
 
-File: anki-gt.info,  Node: License,  Prev: Building the Info manual,  Up: Top
+File: anki-gt.info,  Node: License,  Prev: Info manual,  Up: Top
 
 License
 *******
@@ -334,26 +343,26 @@ GPL-3.0-or-later.  See ‘LICENSE’ at the top of the repository.
 
 
 Tag Table:
-Node: Top206
-Node: Overview762
-Node: Requirements1523
-Node: Installation1840
-Node: From a Git clone2031
-Node: From straightel2308
-Node: Configuration2583
-Node: Connection2830
-Node: Ruby (furigana) display3305
-Node: Raise Anki after a jump3700
-Node: Audio playback4317
-Node: Preview and list buffers4683
-Node: Usage5435
-Node: Decks buffer5660
-Node: Cards buffer6085
-Node: Notes buffer7249
-Node: Preview pane7748
-Node: Find a note by field / value8247
-Node: Building the Info manual9018
-Node: License9362
+Node: Top186
+Node: Overview731
+Node: Requirements1346
+Node: Installation1663
+Node: From a Git clone1856
+Node: Using straightel2134
+Node: Configuration2412
+Node: Connection2659
+Node: Ruby (furigana) display3134
+Node: Raise Anki after a jump3529
+Node: Audio playback4035
+Node: Preview and list buffers4401
+Node: Usage5153
+Node: Decks buffer5365
+Node: Cards buffer5790
+Node: Notes buffer6954
+Node: Preview pane7453
+Node: Find a note by field / value7952
+Node: Info manual8723
+Node: License9772
 
 End Tag Table
 
