@@ -13,9 +13,11 @@
 #   make info           — export README.org to docs/anki-gt.info
 #   make clean          — remove every *.elc file and generated docs
 #   make check          — compile + lint + checkdoc + check-declare + test
-#   make check-ci       — same as `make check' but under $(CI_EMACS)
-#                         (defaults to emacs-plus@30, matching the
-#                         GitHub Actions matrix; run before pushing)
+#   make check-ci       — `make check' under every Emacs in
+#                         $(CI_EMACS_LIST) (emacs-plus@30 and @31,
+#                         matching the GitHub Actions matrix; run
+#                         before pushing).  Errors out when either
+#                         binary is absent.
 #
 # Override the Emacs binary by passing EMACS=path/to/emacs.
 #
@@ -184,20 +186,31 @@ clean:
 
 check: compile lint checkdoc check-declare test
 
-# CI-mirror check: force the same Emacs version the GitHub Actions
-# matrix pins.  The default `make check' runs under whatever `emacs'
-# resolves to on the developer's PATH, which is typically the
-# latest release and has looser checkdoc / package-lint rules than
-# the version CI uses; that lets docstring drift slip through to a
-# CI failure.  Set CI_EMACS below to the absolute path of the
-# CI-matching binary and use `make check-ci' before pushing.
-CI_EMACS ?= /opt/homebrew/opt/emacs-plus@30/bin/emacs
+# CI-mirror check.  EMACS_30 / EMACS_31 are the Package-Requires floor
+# and the latest release, matching the GitHub Actions matrix in
+# .github/workflows/package-lint.yml.  Both are mandatory: a skipped
+# version reports a pass that CI does not agree with, so `check-ci'
+# refuses to run until both are installed.  The default `make check'
+# runs under whatever `emacs' resolves to on PATH and cannot prove
+# multi-version compatibility.
+EMACS_30 ?= /opt/homebrew/opt/emacs-plus@30/bin/emacs
+EMACS_31 ?= /opt/homebrew/opt/emacs-plus@31/bin/emacs
+CI_EMACS_LIST ?= $(EMACS_30) $(EMACS_31)
 
+# Every binary is verified before the first one runs, so a missing
+# install is reported up front rather than after a full pass.
 check-ci:
-	@if [ ! -x "$(CI_EMACS)" ]; then \
-	  echo "CI_EMACS not executable: $(CI_EMACS)"; \
-	  echo "Install with: brew install emacs-plus@30"; \
-	  echo "Or override: make check-ci CI_EMACS=/path/to/emacs"; \
+	@missing=""; \
+	for e in $(CI_EMACS_LIST); do \
+	  [ -x "$$e" ] || missing="$$missing $$e"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "check-ci: required Emacs not executable:$$missing"; \
+	  echo "Install both:  brew install emacs-plus@30 emacs-plus@31"; \
+	  echo "Or override:   make check-ci CI_EMACS_LIST=\"/path/to/emacs ...\""; \
 	  exit 1; \
 	fi
-	$(MAKE) EMACS=$(CI_EMACS) check
+	@for e in $(CI_EMACS_LIST); do \
+	  echo "==> check-ci under $$e ($$($$e --version | head -1))"; \
+	  $(MAKE) EMACS=$$e check || exit 1; \
+	done

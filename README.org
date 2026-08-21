@@ -23,7 +23,7 @@ browser) are one keystroke away.
 
 * Requirements
 
-- Emacs 27.1 or newer.
+- Emacs 30.1 or newer.
 - Anki running with the
   [[https://ankiweb.net/shared/info/2055492159][AnkiConnect]] add-on
   installed and reachable at =http://127.0.0.1:8765= by default.

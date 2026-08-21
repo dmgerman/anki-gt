@@ -8,7 +8,7 @@
 ;; Keywords: convenience, tools
 ;; URL: https://github.com/dmgerman/anki-gt
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "30.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
