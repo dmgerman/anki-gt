@@ -1,0 +1,61 @@
+name: package-lint
+
+on:
+  push:
+    paths:
+      - '**.el'
+      - '.github/workflows/package-lint.yml'
+      - 'Makefile'
+      - 'Makefile.common'
+  pull_request:
+    paths:
+      - '**.el'
+      - '.github/workflows/package-lint.yml'
+      - 'Makefile'
+      - 'Makefile.common'
+
+jobs:
+  lint:
+    name: check on Emacs ${{ matrix.emacs_version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs_version:
+          - '30.1'  # Package-Requires floor
+          - '31.1'  # latest release
+        include:
+          - emacs_version: 'snapshot'
+            allow-failure: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Emacs
+        uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs_version }}
+
+      - name: Run byte-compile via make
+        run: make compile
+        continue-on-error: ${{ matrix.allow-failure == true }}
+
+      - name: Run package-lint via make
+        run: make lint
+        continue-on-error: ${{ matrix.allow-failure == true }}
+
+      - name: Run checkdoc via make
+        run: make checkdoc
+        continue-on-error: ${{ matrix.allow-failure == true }}
+
+      - name: Run check-declare via make
+        run: make check-declare
+        continue-on-error: ${{ matrix.allow-failure == true }}
+
+      # AnkiConnect is unreachable on the runner, so the integration
+      # tests would skip themselves anyway.  Setting the variable makes
+      # that explicit rather than dependent on a failed probe.
+      - name: Run tests via make
+        run: make test
+        env:
+          ANKI_GT_NO_INTEGRATION: '1'
+        continue-on-error: ${{ matrix.allow-failure == true }}

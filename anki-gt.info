@@ -67,7 +67,7 @@ File: anki-gt.info,  Node: Requirements,  Next: Installation,  Prev: Overview,  
 Requirements
 ************
 
-   • Emacs 27.1 or newer.
+   • Emacs 30.1 or newer.
    • Anki running with the AnkiConnect
      (https://ankiweb.net/shared/info/2055492159) add-on installed and
      reachable at ‘http://127.0.0.1:8765’ by default.
